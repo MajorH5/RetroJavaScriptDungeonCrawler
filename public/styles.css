@@ -1,0 +1,24 @@
+@font-face {
+  font-family: 'pixel-font';
+  src: url('assets/fonts/pixel-font.ttf');
+}
+
+canvas {
+  border: 16px solid black;
+}
+
+body {
+  font-family: pixel-font;
+  font-size: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  color: white;
+  background-color: #080808;
+  font: pixel-font;
+}
+
+p {
+  margin: 3px;
+}
