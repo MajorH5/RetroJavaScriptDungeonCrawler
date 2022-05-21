@@ -757,7 +757,7 @@ async function descend () {
   generateRandomMobs(worldMapTileSet, dungeonDepth, dungeonDepth * 3);
   
   player.x = 1;
-  player.y = 1
+  player.y = 1;
 
   tweenCameraToPoint(1, 1);
 
@@ -1124,7 +1124,5 @@ document.addEventListener('keydown', ({ key }) => { keys[key] = 1; });
 document.addEventListener('keyup', ({ key }) => { delete keys[key]; });
 
 canvas.addEventListener('mousemove', ({ offsetX, offsetY }) => { mouse.x = offsetX; mouse.y = offsetY });
-canvas.addEventListener('mousedown', (e) => { e.preventDefault(); 
-  mouse.down = e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'none';
-});
+canvas.addEventListener('mousedown', (e) => { e.preventDefault(); mouse.down = e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'none'; });
 canvas.addEventListener('mouseup', (e) => { e.preventDefault(); mouse.down = 'none' });
