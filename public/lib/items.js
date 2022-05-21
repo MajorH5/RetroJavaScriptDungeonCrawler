@@ -37,6 +37,59 @@ export const Items = (function () {
     return Math.random() * (max - min) + min;
   };
 
+  Items.Generate = function (depth) {
+    let items;
+
+    if (depth === 1) {
+      items = [
+        [Items.SWORD, 0.1],
+        [Items.AMULET, 0.1],
+        [Items.STRENGTH, 0.2],
+        [Items.HEALTH, 0.4]
+      ];
+    } else if (depth > 1 && depth <= 3) {
+      items = [
+        [Items.DIVINE_SHIELD, 0.1],
+        [Items.LONGSWORD, 0.2],
+        [Items.STRENGTH, 0.2],
+        [Items.SWORD, 0.3],
+        [Items.CHESTPLATE, 0.3],
+        [Items.HEALTH, 0.4]
+      ]
+    } else if (depth > 3 && depth <= 6) {
+      items = [
+        [Items.DIVINE_SHIELD, 0.3],
+        [Items.LONGSWORD, 0.4],
+        [Items.STRENGTH, 0.4],
+        [Items.CHESTPLATE, 0.4],
+        [Items.HEALTH, 0.5]
+      ]
+    } else {
+      items = [
+        [Items.STRENGTH, 0.3],
+        [Items.LONGSWORD, 0.5],
+        [Items.CHESTPLATE, 0.5],
+        [Items.DIVINE_SHIELD, 0.5],
+        [Items.HEALTH, 0.5]
+      ]
+    }
+
+    let item = null;
+      
+    while (item === null) {
+      const random = Math.random();
+
+      for (const [potentialItem, chance] of items) {
+        if (random <= chance) {
+          item = potentialItem;
+          break;
+        }
+      }
+    }
+
+    return item;
+  }
+
   Items.SWORD = new Item('Sword', 0, 0, function () {
     return randomInt(2, 4);
   });
@@ -55,8 +108,32 @@ export const Items = (function () {
     }
   });
 
+  Items.DIVINE_SHIELD = new Item('Divine Shield', 3, 1, function () {
+    return Math.random() < .2;
+  });
+
+  Items.CHESTPLATE = new Item('Chestplate', 4, 2, function () {
+    return 2;
+  });
+
+  Items.STRENGTH = new Item('Strength', 5, null, function (player) {
+    player.strength++;
+    return true;
+  });
+
+  Items.LONGSWORD = new Item('Longsword', 6, 0, function () {
+    return randomInt(4, 7);
+  });
+
+  Items.HATCHET = new Item('Hatchet', 7, 0, function () {
+    return randomInt(4, 6);
+  })
+
   Items.Cooldowns = {
-    ['Sword']: 1 / 3
+    ['Sword']: 1 / 3,
+    ['Hatchet']: 1 / 4.8,
+    ['Longsword']: 1,
+    ['Amulet']: 1
   };
 
   return Items

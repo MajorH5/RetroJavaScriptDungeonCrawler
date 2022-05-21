@@ -10,6 +10,7 @@ class Player extends Entity {
     this.gold = 100;
     this.hotBarItems = [null, null, null, null];
     this.lastCollectAttempt = -Infinity;
+    this.lastAccessoryEffect = -Infinity;
     this.lastAttack = -Infinity
     this.backpack = [];
     this.maxItems = 8;
@@ -88,8 +89,44 @@ class Player extends Entity {
     return true;
   }
 
+  damage (amount) {
+    const defense = this.armor ? this.armor.use() : 0;
+    amount -= defense;
+
+    if (amount < 0) {
+      amount = 0
+    }
+
+    const wasBlocked = this.special ? this.special.use() : false;
+
+    if (wasBlocked) {
+      playSound('assets/sounds/snd_bump.wav');
+      return;
+    }
+    
+    super.damage(amount);
+  }
+  
+  performAccessory (time) {
+    const accessoryCooldown = this.accessory ? Items.Cooldowns[this.accessory.name] : Infinity;
+    
+    if ((time - this.lastAccessoryEffect) / 1000 > accessoryCooldown) {
+      const healthGained = this.accessory.use();
+
+      if (player.health < 100) {
+        this.health += healthGained;
+        if (this.health > 100) {
+          this.health = 100;
+        }
+      }
+      
+      this.lastAccessoryEffect = time;
+    }
+  }
+
   update (context, width, scroll) {
     super.update(context, width, scroll);
+    this.performAccessory(new Date());
 
     const cooldown = this.cooldownPercentage();
     const shouldDrawCooldown = cooldown !== 1;
@@ -225,6 +262,7 @@ let lastDescent = -Infinity;
 
 let backpackIsOpen = false;
 let canOpenBackpack = true;
+let isHoldingCell = false;
 
 let gameIsRunning = true;
 
@@ -418,70 +456,118 @@ function drawOnScreenUI(context) {
     let mouseHoveredCell = false;
     
     for (let i = 0; i < player.backpack.length; i++){
-      let cellXPosition = (i * backpackCellSize) % backpackWidth;
-      let cellYPosition = Math.floor((i * backpackCellSize) / backpackWidth) * backpackCellSize;
+      (async function () {
+        let cellXPosition = (i * backpackCellSize) % backpackWidth;
+        let cellYPosition = Math.floor((i * backpackCellSize) / backpackWidth) * backpackCellSize;
+    
+        cellXPosition += backpackPositionX;
+        cellYPosition += backpackPositionY;
+        
+        const item = player.backpack[i];
+        const sprite = item.sprite;
+        const index = item.index;
+        const description = Descriptions.Items[index];
+    
+        const mouseIsInCell = pointInsideRectangle(mouse.x, mouse.y, cellXPosition, cellYPosition, defaultTileSize, defaultTileSize);
+        const leftMouseDown = mouse.down === 'left';
+        const rightMouseDown = mouse.down === 'right';
+        
+        if (mouseIsInCell) {
+          mouseHoveredCell = true;
+          context.globalAlpha = 0.3;
+          context.fillStyle = Colors.WHITE;
+          context.fillRect(cellXPosition, cellYPosition, defaultTileSize, defaultTileSize);
+          context.globalAlpha = 1
+          setMouseCursor('pointer');
   
-      cellXPosition += backpackPositionX;
-      cellYPosition += backpackPositionY;
-      
-      const item = player.backpack[i];
-      const sprite = item.sprite;
-      const index = item.index;
-      const description = Descriptions.Items[index];
+          const useItem = () => {
+            const hotBarIndex = item.hotbarCell;
   
-      const mouseIsInCell = pointInsideRectangle(mouse.x, mouse.y, cellXPosition, cellYPosition, defaultTileSize, defaultTileSize);
-      const leftMouseDown = mouse.down === 'left';
-      const rightMouseDown = mouse.down === 'right';
-      
-      if (mouseIsInCell) {
-        mouseHoveredCell = true;
-        context.globalAlpha = 0.3;
-        context.fillStyle = Colors.WHITE;
-        context.fillRect(cellXPosition, cellYPosition, defaultTileSize, defaultTileSize);
-        context.globalAlpha = 1
-        setMouseCursor('pointer');
-
-        if (leftMouseDown) {
-          const hotBarIndex = item.hotbarCell;
-
-          if (hotBarIndex !== null) { // equippable
-            const currentItem = player.hotBarItems[hotBarIndex];
-            if (currentItem && currentItem.name !== item.name) {
-              const wasCollected = player.collect(currentItem);
-              if (wasCollected) {
-                player.removeHotbarItem(currentItem);
+            if (hotBarIndex !== null) { // equippable
+              const currentItem = player.hotBarItems[hotBarIndex];
+              if (currentItem && currentItem.name !== item.name) {
+                const wasCollected = player.collect(currentItem);
+                if (wasCollected) {
+                  player.removeHotbarItem(currentItem);
+                  player.removeInventoryItem(item);
+                  player.hotBarItems[hotBarIndex] = item;
+                  playSound('assets/sounds/snd_equip.wav');
+                }
+              } else if (!currentItem) {
                 player.removeInventoryItem(item);
                 player.hotBarItems[hotBarIndex] = item;
                 playSound('assets/sounds/snd_equip.wav');
               }
-            } else if (!currentItem) {
-              player.removeInventoryItem(item);
-              player.hotBarItems[hotBarIndex] = item;
-              playSound('assets/sounds/snd_equip.wav');
-            }
-          } else { // usable
-            const wasUsed = item.use(player);
-
-            if (wasUsed) {
-              player.removeInventoryItem(item);
-              playSound('assets/sounds/snd_use.wav');
-            }
-          }
-
-          onInteractionPerformed()
-          backpackIsOpen = false;
-        } else if (rightMouseDown) {
-          openedSpriteInfo = { sprite, description };
-        }
-      } else if (!mouseHoveredCell) {
-        setMouseCursor('default');
-      }
+            } else { // usable
+              const wasUsed = item.use(player);
   
-      sprite.visible = true;
-      sprite.update(
-        cellXPosition, cellYPosition,
-        defaultTileSize, context
-      );
+              if (wasUsed) {
+                player.removeInventoryItem(item);
+                playSound('assets/sounds/snd_use.wav');
+              }
+            }
+  
+            onInteractionPerformed()
+            backpackIsOpen = false;
+          };
+
+          const dropItem = () => {
+            const [dropCell] = getNeighboringTiles(player.floorX, player.floorY).filter(tile => {
+              return isPassableCell(tile.x, tile.y);
+            });
+
+            if (!dropCell) {
+              dropCell = { x: player.floorX, y: player.floorY };
+            }
+
+            item.x = player.floorX;
+            item.y = player.floorY;
+            
+            player.removeInventoryItem(item);
+            globalWorldItems.push(item);
+
+            item.dropTo(dropCell.x, dropCell.y);
+
+            onInteractionPerformed();
+            backpackIsOpen = false;
+          };
+          
+          if (leftMouseDown && !isHoldingCell) {
+            isHoldingCell = true;
+
+            let secondsToDrop = 0.5;
+            let start = new Date();
+            let elapsed = 0;
+  
+            while (mouse.down === 'left') {
+              elapsed = (new Date() - start) / 1000;
+
+              if (elapsed >= secondsToDrop) {
+                dropItem();
+                break;
+              }
+              
+              await new Promise((resolve) => setTimeout(resolve, 1));
+            }
+
+            if (elapsed < secondsToDrop){
+              useItem();
+            }
+
+            isHoldingCell = false;
+          } else if (rightMouseDown) {
+            openedSpriteInfo = { sprite, description };
+          }
+        } else if (!mouseHoveredCell) {
+          setMouseCursor('default');
+        }
+    
+        sprite.visible = true;
+        sprite.update(
+          cellXPosition, cellYPosition,
+          defaultTileSize, context
+        );
+      })();
     }
   } else {
     player.backpack.forEach(item => {
@@ -933,20 +1019,26 @@ async function handleCellInteraction (x, y) {
 
   switch (tile) {
     case Tiles.LOCKED_CHEST:
-      const item = [
-        Items.SWORD, Items.AMULET, Items.HEALTH
-      ][Math.floor(Math.random() * 3)].spawn(x, y);
-      const neighbors = getNeighboringTiles(x, y).filter(tile => {
-        return isPassableCell(tile.x, tile.y);
-      });
+      let spawnAmmount = Math.floor(Math.random() * (5 - 1) + 1) + Math.floor(dungeonDepth / 2);
 
-      globalWorldItems.push(item);
+      if (spawnAmmount > 8) {
+        spawnAmmount = 8;
+      }
       
-      if (neighbors.length > 0) {
-        const randomCell = neighbors[Math.floor(Math.random() * neighbors.length)];
-        item.dropTo(randomCell.x, randomCell.y);
-      } else {
-        item.dropTo(x, y);
+      for (let i = 0; i < spawnAmmount; i++) {
+        const item = Items.Generate(dungeonDepth).spawn(x, y);
+        const neighbors = getNeighboringTiles(x, y).filter(tile => {
+          return isPassableCell(tile.x, tile.y);
+        });
+      
+        globalWorldItems.push(item);
+        
+        if (neighbors.length > 0) {
+          const randomCell = neighbors[Math.floor(Math.random() * neighbors.length)];
+          item.dropTo(randomCell.x, randomCell.y);
+        } else {
+          item.dropTo(x, y);
+        }
       }
       
         

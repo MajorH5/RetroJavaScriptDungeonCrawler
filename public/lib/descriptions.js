@@ -11,7 +11,12 @@ export const Descriptions = (function () {
   const Items = {
     [0]: 'A worn old sword',
     [1]: 'A dusty ancient amulet. You feel a\nfaint magical power lurking within',
-    [2]: 'A Vial of healing elixir',
+    [2]: 'A vial of healing elixir',
+    [3]: 'A robust shield blessed with divine\npower',
+    [4]: 'A simple steel-reinforced\nchestplate',
+    [5]: 'A flask of potent pure strength',
+    [6]: 'A longsword sword used by\ngreat warriors',
+    [7]: 'A sturdy copper battle hatchet'
   };
 
   const Entities = {
