@@ -4,10 +4,9 @@ const context = canvas.getContext('2d');
 class Player extends Entity {
   constructor(x, y) {
     const sprite = new Sprite('assets/images/player.png', 96, 64);
-    
+
     super(x, y, sprite);
 
-    this.gold = 100;
     this.hotBarItems = [null, null, null, null];
     this.lastCollectAttempt = -Infinity;
     this.lastAccessoryEffect = -Infinity;
@@ -17,24 +16,24 @@ class Player extends Entity {
     this.strength = 0;
   }
 
-  get weapon () { return this.hotBarItems[0]; }
-  get special () { return this.hotBarItems[1]; }
-  get armor () { return this.hotBarItems[2]; }
-  get accessory () { return this.hotBarItems[3]; }
+  get weapon() { return this.hotBarItems[0]; }
+  get special() { return this.hotBarItems[1]; }
+  get armor() { return this.hotBarItems[2]; }
+  get accessory() { return this.hotBarItems[3]; }
 
-  getWeaponCooldown () {
+  getWeaponCooldown() {
     const weapon = this.weapon;
     return weapon ? Items.Cooldowns[weapon.name] : 1 / 2;
   }
 
-  getWeaponDamage () {
+  getWeaponDamage() {
     const weapon = this.weapon;
     const damage = weapon ? weapon.use() : Math.floor(Math.random() * (3 - 1) + 1);
-    
+
     return damage + this.strength;
   }
 
-  cooldownPercentage () {
+  cooldownPercentage() {
     const timeNow = new Date();
     let elapsed = (timeNow - this.lastAttack) / 1000;
     const cooldown = this.getWeaponCooldown();
@@ -45,8 +44,8 @@ class Player extends Entity {
 
     return elapsed / cooldown;
   }
-  
-  attack (entity) {
+
+  attack(entity) {
     const timeNow = new Date();
     const weaponCooldown = this.getWeaponCooldown();
     const cannotPerformAttack = (timeNow - this.lastAttack) / 1000 < weaponCooldown;
@@ -63,33 +62,33 @@ class Player extends Entity {
     this.lastAttack = timeNow;
   }
 
-  removeInventoryItem (item) {
+  removeInventoryItem(item) {
     const index = this.backpack.indexOf(item);
     this.backpack.splice(index, 1);
   }
 
-  removeHotbarItem (item) {
+  removeHotbarItem(item) {
     const index = this.hotBarItems.indexOf(item);
     if (index !== -1) {
       this.hotBarItems[index] = null;
     }
   }
-  
-  collect (item) {
+
+  collect(item) {
     this.lastCollectAttempt = new Date();
-    if (this.backpack.length === this.maxItems){
+    if (this.backpack.length === this.maxItems) {
       return false;
     }
-    
+
     const index = globalWorldItems.indexOf(item);
     globalWorldItems.splice(index, 1);
-    
+
     item.sprite.visible = false;
     this.backpack.push(item);
     return true;
   }
 
-  damage (amount) {
+  damage(amount) {
     const defense = this.armor ? this.armor.use() : 0;
     amount -= defense;
 
@@ -103,13 +102,13 @@ class Player extends Entity {
       playSound('assets/sounds/snd_bump.wav');
       return;
     }
-    
+
     super.damage(amount);
   }
-  
-  performAccessory (time) {
+
+  performAccessory(time) {
     const accessoryCooldown = this.accessory ? Items.Cooldowns[this.accessory.name] : Infinity;
-    
+
     if ((time - this.lastAccessoryEffect) / 1000 > accessoryCooldown) {
       const healthGained = this.accessory.use();
 
@@ -119,52 +118,52 @@ class Player extends Entity {
           this.health = 100;
         }
       }
-      
+
       this.lastAccessoryEffect = time;
     }
   }
 
-  update (context, width, scroll) {
+  update(context, width, scroll) {
     super.update(context, width, scroll);
     this.performAccessory(new Date());
 
     const cooldown = this.cooldownPercentage();
     const shouldDrawCooldown = cooldown !== 1;
-    
-    if (shouldDrawCooldown){
+
+    if (shouldDrawCooldown) {
       const cooldownWidth = defaultTileSize;
       const cooldownHeight = 10;
-      
+
       this.hpBarOffset = 25
-      
+
       const [screenX, screenY] = convertToScreenCoordinates(this.x, this.y);
-  
+
       context.strokeStyle = Colors.WHITE;
       context.fillStyle = Colors.BLACK;
-  
+
       const cooldownBarPositionX = screenX + defaultTileSize / 2 - cooldownWidth / 2;
       const cooldownBarPositionY = screenY - cooldownHeight - 10;
-      
+
       context.beginPath();
       context.rect(cooldownBarPositionX, cooldownBarPositionY, cooldownWidth, cooldownHeight);
       context.fill();
       context.stroke();
-  
+
       context.fillStyle = Colors.WHITE;
-  
+
       let cooldownBarWidth = (cooldownWidth * cooldown) - 1;
-  
+
       if (cooldownBarWidth < 0) {
         cooldownBarWidth = 0;
       }
-      
+
       context.fillRect(cooldownBarPositionX + 1, cooldownBarPositionY + 1, cooldownBarWidth, cooldownHeight - 1);
     } else {
       this.hpBarOffset = 5;
     }
   }
-  
-  moveTo (...args) {
+
+  moveTo(...args) {
     this.lastCollectAttempt = -Infinity;
     playSound('assets/sounds/snd_step.wav');
     return super.moveTo(...args);
@@ -172,42 +171,53 @@ class Player extends Entity {
 }
 
 class Skeleton extends Entity {
-  constructor (x, y) {
+  constructor(x, y) {
     const sprite = new Sprite('assets/images/skeleton.png');
     super(x, y, sprite);
     this.setMaxHealth(10);
     this.targettingTile = null;
   }
 
-  async behave () {
+  async behave() {
     if (Math.random() < 0.03 && !this.targettingTile) {
       this.targettingTile = true;
-      
+
       const randomXTile = player.floorX;
       const randomYTile = player.floorY;
-      
-      const path = performPathfinding(this.x, this.y, randomXTile, randomYTile);
+
+      const path = performPathfinding(this.floorX, this.floorY, randomXTile, randomYTile);
 
       if (path.length === 0) { // nasty hack...
         path.push({ x: this.x, y: this.y });
       }
-      
+
+      this.path = path;
+
       for (const point of path) {
+        this.targetCell.x = point.x;
+        this.targetCell.y = point.y;
+
         await this.moveTo(point.x, point.y, true);
 
+        this.targetCell.x = null;
+        this.targetCell.y = null;
+
         while (player.isAlive && this.isAlive && isNeighboringCell(this.x, this.y, player.floorX, player.floorY)) {
+          this.path = null;
           await this.hitCell(player.floorX, player.floorY, 0.1);
           player.damage(8);
           await this.pause(1);
         }
-        
+
+        this.path = path;
       }
-      
+
+      this.path = null;
       this.targettingTile = false;
-    } 
+    }
   }
-  
-  update (...args) {
+
+  update(...args) {
     this.behave();
     super.update(...args);
   }
@@ -222,7 +232,18 @@ const Colors = {
   BLACK: '#000000', WHITE: '#FFFFFF',
   RED: '#FF0000'
 };
-const Settings = { freeScrollEnabled: false };
+const Settings = {
+  freeScrollEnabled: false,
+  showFPS: false,
+  showDebug: false,
+
+  showGrid: false,
+  showCollision: false,
+  showEntityBounds: false,
+
+  showPathfinding: false
+
+};
 
 const solidTiles = [Tiles.BRICK, Tiles.LOCKED_CHEST];
 const interactableTiles = [Tiles.LOCKED_CHEST, Tiles.STAIRCASE_DOWN];
@@ -259,14 +280,17 @@ const playerMoveRate = 1 / 60;
 let dungeonDepth = 0
 let isDescending = false;
 let lastDescent = -Infinity;
+let timeAtGameOver = -Infinity;
 
 let backpackIsOpen = false;
 let canOpenBackpack = true;
 let isHoldingCell = false;
 
 let gameIsRunning = true;
+let gameIsOver = false;
 
 const globalWorldEntities = [];
+const globalWorldParticles = [];
 let globalWorldItems = [];
 
 let openedSpriteInfo = null;
@@ -300,7 +324,7 @@ function getTileImageOffsets(tile) {
   return [xPos, yPos];
 }
 
-function playSound (assetURL) {
+function playSound(assetURL) {
   const sound = new Audio(assetURL);
   sound.play();
   return sound;
@@ -316,26 +340,27 @@ function isOffScreen(x, y) {
   return false;
 }
 
-function isNeighboringCell (x, y, checkX, checkY) {
+function isNeighboringCell(x, y, checkX, checkY) {
   const neighborCell = getNeighboringTiles(x, y).filter(cell => {
     return cell.x === checkX && cell.y == checkY;
   });
   return neighborCell.length === 1;
 }
 
-function getItemsAtTile (x, y) {
+function getItemsAtTile(x, y) {
   return globalWorldItems.filter(item => {
     return Math.floor(item.x) === x && Math.floor(item.y) === y;
   });
 }
 
-function getEntityAtTile (x, y) {
+function getEntityAtTile(x, y) {
   return globalWorldEntities.find(entity => {
-    return entity.floorX === x && entity.floorY === y;
+    return (entity.floorX === x && entity.floorY === y) ||
+      (entity.targetCell.x === x && entity.targetCell.y === y);
   });
 }
 
-function areItemsInTile (x, y){
+function areItemsInTile(x, y) {
   return getItemsAtTile(x, y).length > 0;
 }
 
@@ -362,10 +387,169 @@ function drawGlobalTiles(context, tileSet) {
   }
 }
 
+function screenWipeEffect(context, color, duration) {
+  const wipeWidth = canvasSizeWidth;
+  const wipeHeight = canvasSizeHeight;
+  const wipeX = 0;
+  const wipeY = 0;
+
+  const wipeStart = Date.now();
+  const wipeEnd = wipeStart + duration;
+
+  const wipeInterval = setInterval(() => {
+    const wipeTime = Date.now();
+    const wipeProgress = (wipeTime - wipeStart) / duration;
+
+    context.fillStyle = color;
+    context.fillRect(wipeX, wipeY, wipeWidth * wipeProgress, wipeHeight);
+
+    if (wipeTime >= wipeEnd) {
+      clearInterval(wipeInterval);
+    }
+  }, 1);
+}
+
+function drawGridOutlines(context) {
+  context.strokeStyle = Colors.RED;
+  context.fillStyle = Colors.RED
+  context.lineWidth = 1;
+
+  for (let y = 0; y < worldMapTileSet.length; y++) {
+    const tileSetRow = worldMapTileSet[y];
+    for (let x = 0; x < tileSetRow.length; x++) {
+      const [screenX, screenY] = convertToScreenCoordinates(x, y);
+
+      if (isOffScreen(screenX, screenY)) {
+        continue;
+      }
+
+      const cell = `${x}, ${y}`;
+      const isSolid = solidTiles.includes(worldMapTileSet[y][x]);
+      const isInteractable = interactableTiles.includes(worldMapTileSet[y][x]);
+
+      const cellInfo = `${cell} ${isSolid ? '\nsolid' : ''} ${isInteractable ? '\ninteractable' : ''}`.split('\n');
+
+      context.textAlign = 'start'
+
+      for (let i = 0; i < cellInfo.length; i++) {
+        context.fillText(cellInfo[i], screenX + 5, screenY + (i * canvasFontSize / 3) + 16);
+      }
+
+      context.strokeRect(screenX, screenY, defaultTileSize, defaultTileSize);
+    }
+  }
+}
+
+function drawDebugInfo(context) {
+  context.fillStyle = Colors.RED;
+  context.textAlign = 'start'
+
+  context.fillText(`${player.floorX}, ${player.floorY}`, canvasCenterX, canvasCenterY - canvasFontSize / 2);
+  context.fillText(`${player.x}, ${player.y}`, canvasCenterX, canvasCenterY);
+  context.fillText(`${player.targetCell.x}, ${player.targetCell.y}`, canvasCenterX, canvasCenterY + canvasFontSize / 2);
+}
+
+function drawFps(context) {
+  context.fillStyle = Colors.RED;
+  context.textAlign = 'start'
+
+  context.fillText(`FPS: ${Math.round(fps)}`, canvasCenterX, canvasCenterY + canvasFontSize / 2);
+}
+
+function particleConfettiEffect(context) {
+  const particleCount = 10;
+  const particleSize = 16;
+  const particleSpeed = 0.5;
+  const particleSpeedVariance = 0.5;
+  const particleColor = '#FFFFFF';
+  const particleColorVariance = 0.1;
+  const particleLife = 1;
+  const particleLifeVariance = 0.5;
+
+  const particles = [];
+  for (let i = 0; i < particleCount; i++) {
+    const particle = {
+      x: Math.random() * canvasSizeWidth,
+      y: Math.random() * canvasSizeHeight,
+      speed: Math.random() * particleSpeed + particleSpeedVariance,
+      life: Math.random() * particleLife + particleLifeVariance,
+      color: particleColor,
+      size: particleSize
+    };
+    particles.push(particle);
+  }
+
+  const updateParticle = (particle) => {
+    particle.y += particle.speed;
+    particle.life -= 0.01;
+    particle.color = `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${particle.life})`;
+    particle.size = Math.random() * particleSize;
+    return particle;
+  };
+
+  const drawParticle = (particle) => {
+    context.fillStyle = particle.color;
+    context.fillRect(particle.x - (particle.size / 2), particle.y - (particle.size / 2), particle.size, particle.size);
+  };
+
+  const drawParticles = () => {
+    for (let i = 0; i < particles.length; i++) {
+      const particle = particles[i];
+      if (particle.life > 0) {
+        drawParticle(particle);
+      } else {
+        particles.splice(i, 1);
+      }
+    }
+  };
+
+  const updateParticles = () => {
+    for (let i = 0; i < particles.length; i++) {
+      particles[i] = updateParticle(particles[i]);
+    }
+  };
+
+  const draw = () => {
+    drawParticles();
+    updateParticles();
+
+    if (particles.length > 0) {
+      requestAnimationFrame(draw);
+    }
+  }
+
+  draw();
+}
+
 function drawOnScreenUI(context) {
+  if (!player.isAlive) {
+    const elapsedSinceGameOver = (new Date() - timeAtGameOver) / 1000;
+    const currentAlpha = context.globalAlpha;
+
+    context.textAlign = 'center';
+    context.fillStyle = Colors.WHITE;
+    context.strokeStyle = Colors.BLACK;
+    context.lineWidth = 5;
+    context.font = '90px pixel-font';
+
+    context.globalAlpha = 1;
+
+    context.strokeText('Gameover!', canvasCenterX, canvasCenterY);
+    context.fillText('Gameover!', canvasCenterX, canvasCenterY);
+
+    if (elapsedSinceGameOver > 2) {
+      context.font = '40px pixel-font';
+      context.strokeText('Try again? [Space]', canvasCenterX, canvasCenterY + 50);
+      context.fillText('Try again? [Space]', canvasCenterX, canvasCenterY + 50);
+    }
+
+    context.globalAlpha = currentAlpha;
+
+    return;
+  }
+
   const elapsedSinceDescend = (new Date() - lastDescent) / 1000;
   if (elapsedSinceDescend > 0.5 && elapsedSinceDescend < 3) {
-    console.log('goin down')
     context.font = '60px pixel-font';
     context.textAlign = 'center';
     context.fillStyle = Colors.WHITE;
@@ -376,7 +560,7 @@ function drawOnScreenUI(context) {
     context.fillText('Depth: ' + dungeonDepth, canvasCenterX, canvasCenterY);
   }
 
-  
+
   const itemSize = defaultTileSize / 1.5;
   const hotBarWidth = itemSize * 4;
   const hotBarHeight = itemSize;
@@ -389,7 +573,7 @@ function drawOnScreenUI(context) {
 
   context.strokeStyle = Colors.WHITE;
   context.fillStyle = Colors.BLACK;
-  
+
   context.lineWidth = 3;
   context.beginPath();
   context.rect(hotBarX, hotBarY, hotBarWidth, hotBarHeight);
@@ -434,44 +618,44 @@ function drawOnScreenUI(context) {
   context.stroke();
 
   const hpLevelWidth = (hpBarWidth * (player.health / 100)) - 3;
-  
+
   context.fillStyle = Colors.WHITE;
   context.fillRect(hpBarX + 1.5, hpBarY + 1.5, hpLevelWidth < 0 ? 0 : hpLevelWidth, hpBarHeight - 3);
-  
+
   if (backpackIsOpen) {
     const backpackCellSize = defaultTileSize;
     const backpackWidth = backpackCellSize * 4;
     const backpackHeight = backpackCellSize * 2;
-    
+
     context.fillStyle = Colors.BLACK;
-  
+
     const backpackPositionX = canvasCenterX - backpackWidth / 2;
     const backpackPositionY = canvasCenterY - backpackHeight / 2 - 50;
-    
+
     context.beginPath();
     context.rect(backpackPositionX, backpackPositionY, backpackWidth, backpackHeight);
     context.fill();
     context.stroke();
-  
+
     let mouseHoveredCell = false;
-    
-    for (let i = 0; i < player.backpack.length; i++){
+
+    for (let i = 0; i < player.backpack.length; i++) {
       (async function () {
         let cellXPosition = (i * backpackCellSize) % backpackWidth;
         let cellYPosition = Math.floor((i * backpackCellSize) / backpackWidth) * backpackCellSize;
-    
+
         cellXPosition += backpackPositionX;
         cellYPosition += backpackPositionY;
-        
+
         const item = player.backpack[i];
         const sprite = item.sprite;
         const index = item.index;
         const description = Descriptions.Items[index];
-    
+
         const mouseIsInCell = pointInsideRectangle(mouse.x, mouse.y, cellXPosition, cellYPosition, defaultTileSize, defaultTileSize);
         const leftMouseDown = mouse.down === 'left';
         const rightMouseDown = mouse.down === 'right';
-        
+
         if (mouseIsInCell) {
           mouseHoveredCell = true;
           context.globalAlpha = 0.3;
@@ -479,10 +663,10 @@ function drawOnScreenUI(context) {
           context.fillRect(cellXPosition, cellYPosition, defaultTileSize, defaultTileSize);
           context.globalAlpha = 1
           setMouseCursor('pointer');
-  
+
           const useItem = () => {
             const hotBarIndex = item.hotbarCell;
-  
+
             if (hotBarIndex !== null) { // equippable
               const currentItem = player.hotBarItems[hotBarIndex];
               if (currentItem && currentItem.name !== item.name) {
@@ -500,13 +684,13 @@ function drawOnScreenUI(context) {
               }
             } else { // usable
               const wasUsed = item.use(player);
-  
+
               if (wasUsed) {
                 player.removeInventoryItem(item);
                 playSound('assets/sounds/snd_use.wav');
               }
             }
-  
+
             onInteractionPerformed()
             backpackIsOpen = false;
           };
@@ -522,7 +706,7 @@ function drawOnScreenUI(context) {
 
             item.x = player.floorX;
             item.y = player.floorY;
-            
+
             player.removeInventoryItem(item);
             globalWorldItems.push(item);
 
@@ -531,14 +715,14 @@ function drawOnScreenUI(context) {
             onInteractionPerformed();
             backpackIsOpen = false;
           };
-          
+
           if (leftMouseDown && !isHoldingCell) {
             isHoldingCell = true;
 
             let secondsToDrop = 0.5;
             let start = new Date();
             let elapsed = 0;
-  
+
             while (mouse.down === 'left') {
               elapsed = (new Date() - start) / 1000;
 
@@ -546,11 +730,11 @@ function drawOnScreenUI(context) {
                 dropItem();
                 break;
               }
-              
+
               await new Promise((resolve) => setTimeout(resolve, 1));
             }
 
-            if (elapsed < secondsToDrop){
+            if (elapsed < secondsToDrop) {
               useItem();
             }
 
@@ -561,7 +745,7 @@ function drawOnScreenUI(context) {
         } else if (!mouseHoveredCell) {
           setMouseCursor('default');
         }
-    
+
         sprite.visible = true;
         sprite.update(
           cellXPosition, cellYPosition,
@@ -575,7 +759,7 @@ function drawOnScreenUI(context) {
     });
   }
 
-    if (openedSpriteInfo) {
+  if (openedSpriteInfo) {
     const infoWindowWidth = defaultTileSize * 4;
     const infoWindowHeight = defaultTileSize * 2;
 
@@ -600,7 +784,7 @@ function drawOnScreenUI(context) {
     sprite.visible = state;
 
     const fontSize = 35;
-    
+
     context.font = fontSize + 'px pixel-font';
     context.textAlign = 'start';
     context.fillStyle = Colors.WHITE;
@@ -612,24 +796,29 @@ function drawOnScreenUI(context) {
 
       context.fillText(line, infoWindowPositionX + 16, infoWindowPositionY + defaultTileSize + 32 + offset);
     }
-    
+
   }
 }
 
-function isPassableCell (x, y) {
+function isPassableCell(x, y) {
   const hasNoOtherEntities = !getEntityAtTile(x, y);
   const isNotSolid = !isSolidTile(x, y);
   const isNotInteractable = !isInteractableTile(x, y);
   const isWithinBounds = isInBounds(x, y);
+  const noneTargettingCell = entitiesTargettingCell(x, y).length === 0;
 
-  if (hasNoOtherEntities && isNotSolid && isNotInteractable && isWithinBounds) {
+  if (
+    hasNoOtherEntities &&
+    isNotSolid && isNotInteractable &&
+    isWithinBounds && noneTargettingCell
+  ) {
     return true;
   }
 
   return false;
 }
 
-function pointInsideRectangle (pointX, pointY, rectX, rectY, rectW, rectH) {
+function pointInsideRectangle(pointX, pointY, rectX, rectY, rectW, rectH) {
   return pointX > rectX &&
     pointX < rectX + rectW &&
     pointY > rectY &&
@@ -647,14 +836,14 @@ function onAfterGameRender(context) {
   context.translate(0.5, 0.5);
 }
 
-function setMouseCursor (cursor) {
+function setMouseCursor(cursor) {
   canvas.style.cursor = cursor;
 }
 
-async function handleWorldScrolling (keysHeld) {
-  const scrollAmmount = Settings.freeScrollEnabled ? 1 : defaultTileSize / 4;
+async function handleWorldScrolling(keysHeld) {
+  const scrollAmmount = Settings.freeScrollEnabled ? 1 * 16 : defaultTileSize / 4;
   const space = ' ';
-  
+
   if (keysHeld.ArrowUp) { worldScroll.y += scrollAmmount; };
   if (keysHeld.ArrowLeft) { worldScroll.x += scrollAmmount; };
   if (keysHeld.ArrowDown) { worldScroll.y += -scrollAmmount; };
@@ -679,7 +868,7 @@ async function handleWorldScrolling (keysHeld) {
   };
 }
 
-function isInBounds (x, y) {
+function isInBounds(x, y) {
   if (worldMapLoaded) {
     return x >= 0 &&
       y >= 0 &&
@@ -690,10 +879,10 @@ function isInBounds (x, y) {
   }
 }
 
-function tweenCameraToPoint (x, y) {
+function tweenCameraToPoint(x, y) {
   const scrollX = canvasCenterX - (x * defaultTileSize) - defaultTileSize / 2;
   const scrollY = canvasCenterY - (y * defaultTileSize) - defaultTileSize / 2;
-  
+
   tweenGlobalScroll(scrollX, scrollY);
 }
 
@@ -702,10 +891,10 @@ function handleKeyboardInput(keysHeld) {
   const cantPerformMovement = (timeNow - player.lastMovement) / 1000 < playerMoveRate;
   const isCurrentlyMoving = player.isMoving;
 
-  if (cantPerformMovement || isCurrentlyMoving) {
+  if (cantPerformMovement || isCurrentlyMoving || gameIsOver) {
     return;
   }
-  
+
   openedSpriteInfo = null;
 
   let playerX = player.floorX;
@@ -721,7 +910,7 @@ function handleKeyboardInput(keysHeld) {
   if (isOutOfBounds) {
     return;
   }
-  
+
   const isNotPassableX = !isPassableCell(playerX, player.floorY);
   const isNotPassableY = !isPassableCell(player.floorX, playerY);
 
@@ -738,7 +927,7 @@ function handleKeyboardInput(keysHeld) {
     handleCellInteraction(playerX, playerY);
     return;
   }
-  
+
   if (isNotPassableX) {
     playerX = player.floorX;
   }
@@ -753,7 +942,7 @@ function handleKeyboardInput(keysHeld) {
   player.moveTo(playerX, playerY, true);
 }
 
-function getTileNameByValue (tile) {
+function getTileNameByValue(tile) {
   const keys = Object.keys(Tiles);
   const values = Object.values(Tiles);
   const index = values.indexOf(tile);
@@ -762,7 +951,7 @@ function getTileNameByValue (tile) {
   return name;
 }
 
-function getTileForSpace (depth) {
+function getTileForSpace(depth) {
   const random = Math.random();
   let tile;
 
@@ -779,15 +968,15 @@ function getTileForSpace (depth) {
   return tile;
 }
 
-function generateNewRooms (depth) {
+function generateNewRooms(depth) {
   const worldTiles = [];
   const holeCreated = {};
-  
+
   for (let i = 0; i < defaultWorldSize; i++) {
     const worldTilesRow = [];
     for (let j = 0; j < defaultWorldSize; j++) {
       const holeWasCreated = holeCreated[j] !== undefined;
-      
+
       if (i === 0 || i === defaultWorldSize - 1 || j === 0 || j === defaultWorldSize - 1) {
         worldTilesRow[j] = Tiles.BRICK;
         continue;
@@ -815,17 +1004,17 @@ function generateNewRooms (depth) {
   return worldTiles;
 }
 
-async function descend () {
+async function descend() {
   if (isDescending) {
     return;
   }
 
   isDescending = true;
   lastDescent = new Date();
-  
+
   dungeonDepth++;
   playSound('assets/sounds/snd_switch.wav');
-  
+
   if (context.globalAlpha !== 0) {
     await new Tween(0.2, [1, 0]).begin(alpha => {
       context.globalAlpha = alpha;
@@ -841,23 +1030,25 @@ async function descend () {
   globalWorldItems = [];
   worldMapLoaded = true;
   generateRandomMobs(worldMapTileSet, dungeonDepth, dungeonDepth * 3);
-  
+
   player.x = 1;
   player.y = 1;
 
   tweenCameraToPoint(1, 1);
 
   await new Promise((resolve) => setTimeout(resolve, 1 * 1000));
-  
+
   await new Tween(0.2, [0, 1]).begin(alpha => {
     context.globalAlpha = alpha;
   });
-  
+
+  particleConfettiEffect(context);
+
   isDescending = false;
 }
 
-function isSolidTile (x, y) {
-  if (isInBounds(x, y)){
+function isSolidTile(x, y) {
+  if (isInBounds(x, y)) {
     const tile = worldMapTileSet[y][x];
     return solidTiles.indexOf(tile) !== -1;
   } else {
@@ -865,8 +1056,8 @@ function isSolidTile (x, y) {
   }
 }
 
-function isInteractableTile(x, y){
-  if (isInBounds(x, y)){
+function isInteractableTile(x, y) {
+  if (isInBounds(x, y)) {
     const tile = worldMapTileSet[y][x];
     return areItemsInTile(x, y) || getEntityAtTile(x, y) !== undefined || interactableTiles.indexOf(tile) !== -1;
   } else {
@@ -874,11 +1065,11 @@ function isInteractableTile(x, y){
   }
 }
 
-function distance (x1, y1, x2, y2) {
+function distance(x1, y1, x2, y2) {
   return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
 }
 
-function getNeighboringTiles (x, y){
+function getNeighboringTiles(x, y) {
   return [
     { x: x + 0, y: y + -1 },
     { x: x + 1, y: y + -1 },
@@ -887,11 +1078,11 @@ function getNeighboringTiles (x, y){
     { x: x + 0, y: y + 1 },
     { x: x + -1, y: y + 1 },
     { x: x + -1, y: y + 0 },
-    { x: x + -1, y: y + -1 },
+    { x: x + -1, y: y + -1 }
   ]
 }
 
-function performPathfinding (startX, startY, endX, endY) {
+function performPathfinding(startX, startY, endX, endY) {
   const openList = [];
   const closedList = [];
   const path = [];
@@ -958,14 +1149,14 @@ function performPathfinding (startX, startY, endX, endY) {
   return path;
 }
 
-async function entityFollowPath (entity, path) {
+async function entityFollowPath(entity, path) {
   entity.currentPath = path;
   for (const point of path) {
     if (entity === player) {
       tweenCameraToPoint(point.x, point.y);
     }
     await entity.moveTo(point.x, point.y, true);
-    
+
     if (entity.currentPath !== path) {
       return false;
     }
@@ -973,35 +1164,47 @@ async function entityFollowPath (entity, path) {
   return true;
 }
 
-function onInteractionPerformed () {
+function onInteractionPerformed() {
   justPerformedInteraction = true;
   setTimeout(() => justPerformedInteraction = false, 100);
 }
 
-async function handleCellInteraction (x, y) {
+function entitiesTargettingCell(x, y) {
+  return globalWorldEntities.filter(entity => {
+    return entity.targetCell.x === x && entity.targetCell.y === y;
+  });
+}
+
+async function handleCellInteraction(x, y) {
   const tile = worldMapTileSet[y][x];
   const name = getTileNameByValue(tile);
+  const isInteractableCell = isInteractableTile(x, y);
 
-  if (justPerformedInteraction) {
+  if (justPerformedInteraction || gameIsOver) {
     return;
   }
 
   const isNextToTile = isNeighboringCell(player.floorX, player.floorY, x, y);
   const isntMovingToCell = player.targetCell.x !== x || player.targetCell.y !== y;
-  
-  if (!isNextToTile && isntMovingToCell) {
+  const shouldApproachTile = (isInteractableCell && !isNextToTile) || !isInteractableCell;
+
+  if (shouldApproachTile && isntMovingToCell) {
     player.targetCell.x = x;
     player.targetCell.y = y;
-    
+
     const path = performPathfinding(player.floorX, player.floorY, x, y);
+
+    player.path = path;
 
     if (path.length === 0) {
       player.targetCell.x = null;
       player.targetCell.y = null;
       return;
     }
-    
+
     await entityFollowPath(player, path);
+
+    player.path = null;
   }
 
   const [itemAtCell] = getItemsAtTile(x, y);
@@ -1025,7 +1228,7 @@ async function handleCellInteraction (x, y) {
     if ((timeNow - player.lastCollectAttempt) / 1000 < 1) {
       return;
     }
-    
+
     const wasPickedUp = player.collect(itemAtCell);
     if (wasPickedUp) {
       playSound('assets/sounds/snd_collect.wav');
@@ -1033,7 +1236,7 @@ async function handleCellInteraction (x, y) {
       playSound('assets/sounds/snd_bump.wav');
     }
     return;
-  }  
+  }
 
   switch (tile) {
     case Tiles.LOCKED_CHEST:
@@ -1042,15 +1245,15 @@ async function handleCellInteraction (x, y) {
       if (spawnAmmount > 8) {
         spawnAmmount = 8;
       }
-      
+
       for (let i = 0; i < spawnAmmount; i++) {
         const item = Items.Generate(dungeonDepth).spawn(x, y);
         const neighbors = getNeighboringTiles(x, y).filter(tile => {
           return isPassableCell(tile.x, tile.y);
         });
-      
+
         globalWorldItems.push(item);
-        
+
         if (neighbors.length > 0) {
           const randomCell = neighbors[Math.floor(Math.random() * neighbors.length)];
           item.dropTo(randomCell.x, randomCell.y);
@@ -1058,8 +1261,8 @@ async function handleCellInteraction (x, y) {
           item.dropTo(x, y);
         }
       }
-      
-        
+
+
       playSound('assets/sounds/snd_chest.wav');
       onInteractionPerformed();
       worldMapTileSet[y][x] = Tiles.EMPTY;
@@ -1073,24 +1276,24 @@ async function handleCellInteraction (x, y) {
   }
 }
 
-function getTileSprite (tile) {
+function getTileSprite(tile) {
   const sprite = new Sprite('assets/images/tileset.png', 96, 64);
   sprite.rectOffsetX = tile % 6 * 16;
   sprite.rectOffsetY = Math.floor(tile / 6) * 16;
   return sprite
 }
 
-async function handleMouseInput (mouse) {
+async function handleMouseInput(mouse) {
   const mouseCellX = Math.floor((mouse.x + -worldScroll.x) / defaultTileSize);
   const mouseCellY = Math.floor((mouse.y + -worldScroll.y) / defaultTileSize);
-  
+
   const rightMouseDown = mouse.down === 'right';
   const leftMouseDown = mouse.down === 'left';
 
   if (mouse.processing || backpackIsOpen || justPerformedInteraction) {
     return;
   }
-  
+
   if (isInBounds(mouseCellX, mouseCellY)) {
     const hoveredTile = worldMapTileSet[mouseCellY][mouseCellX];
     const cellIsInteractable = isInteractableTile(mouseCellX, mouseCellY);
@@ -1100,7 +1303,7 @@ async function handleMouseInput (mouse) {
     } else {
       setMouseCursor('default');
     }
-    
+
     if (leftMouseDown) {
       mouse.processing = true;
       openedSpriteInfo = null;
@@ -1109,9 +1312,9 @@ async function handleMouseInput (mouse) {
     } else if (rightMouseDown) {
       const [item] = getItemsAtTile(mouseCellX, mouseCellY);
       const entity = getEntityAtTile(mouseCellX, mouseCellY);
-      
+
       let sprite, description;
-      
+
       if (item) {
         sprite = item.sprite;
         description = Descriptions.Items[item.index];
@@ -1130,13 +1333,15 @@ async function handleMouseInput (mouse) {
   }
 }
 
-function tweenGlobalScroll (x, y) {
+
+
+function tweenGlobalScroll(x, y) {
   if (worldScrollTween) {
     worldScrollTween.cancel();
   }
-  
+
   const scrollTween = new Tween(0.2, [worldScroll.x, x], [worldScroll.y, y])
-  
+
   scrollTween.begin((x, y) => {
     worldScroll.x = x;
     worldScroll.y = y;
@@ -1171,27 +1376,70 @@ function updateAllEntities(entities) {
   });
 }
 
-function beyondFOV (x, y) {
+function beyondFOV(x, y) {
   const [screenX, screenY] = convertToScreenCoordinates(x, y);
   return isOffScreen(screenX, screenY);
 }
 
-function drawAllWorldItems(items, context){
+function drawAllWorldItems(items, context) {
   items.forEach(item => {
     const [screenX, screenY] = convertToScreenCoordinates(item.x, item.y);
-    
+
     if (isOffScreen(screenX, screenY)) {
       return;
     }
-    
+
     item.sprite.update(screenX, screenY, defaultTileSize, context);
   });
 }
 
-function generateRandomMobs (tiles, depth, maxEntities) {
+function restartGame() {
+  gameIsOver = false;
+  dungeonDepth = 0;
+
+  // fix up player
+  player.health = 100;
+  player.isAlive = true;
+  player.x = 1;
+  player.y = 1;
+  player.hotBarItems = [null, null, null, null];
+  player.backpack = [];
+  player.strength = 0;
+  spawnWorldEntity(player);
+
+  // fix camera
+  tweenCameraToPoint(player.x, player.y);
+
+  // descend function will clean up rest
+  descend();
+}
+
+
+async function checkGameStatus(isGameOver, keysDown) {
+  if (isGameOver) {
+    const space = ' ';
+    if (keysDown[space]) {
+      setTimeout(() => backpackIsOpen = false, 1000);
+      restartGame();
+    }
+    return;
+  }
+
+  if (!player.isAlive) {
+    timeAtGameOver = new Date();
+    gameIsOver = true;
+
+    await new Tween(1, [1, 0]).begin(alpha => {
+      context.globalAlpha = alpha;
+    });
+
+  }
+}
+
+function generateRandomMobs(tiles, depth, maxEntities) {
   for (let y = 0; y < tiles.length; y++) {
     const row = tiles[y];
-    for (let x = 0; x < row.length; x++){
+    for (let x = 0; x < row.length; x++) {
       const isPassable = isPassableCell(x, y);
       const outOfView = beyondFOV(x, y);
       const hasNotHitLimit = globalWorldEntities.length - 1 < maxEntities;
@@ -1212,10 +1460,14 @@ function initGameLoop() {
   context.globalAlpha = 0;
   spawnWorldEntity(player);
   tweenCameraToPoint(player.x, player.y);
-  
+
   descend();
-    
+
+
+
   setInterval(function update() {
+
+    checkGameStatus(gameIsOver, keys);
     onBeforeGameRender(context);
     handleKeyboardInput(keys);
     handleWorldScrolling(keys);
@@ -1223,6 +1475,15 @@ function initGameLoop() {
     updateAllEntities(globalWorldEntities);
     drawAllWorldItems(globalWorldItems, context);
     handleMouseInput(mouse);
+
+    if (Settings.showGrid) {
+      drawGridOutlines(context);
+    }
+
+    if (Settings.showDebug) {
+      drawDebugInfo(context);
+    }
+
     drawOnScreenUI(context);
     onAfterGameRender(context);
   }, gameTickSpeed * 1000);
