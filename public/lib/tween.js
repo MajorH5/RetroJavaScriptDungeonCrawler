@@ -15,10 +15,12 @@ export const Tween = (function() {
       this.active = true;
       this.elapsed = 0;
       this.duration = duration;
+      this.wasCancelled = false;
     }
     
     cancel() {
       this.active = false;
+      this.wasCancelled = true;
     }
     
     begin(handler) {

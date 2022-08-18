@@ -15,7 +15,8 @@ export const Entity = (function() {
       this.health = this.maxHealth;
       this.hpBarOffset = 5;
       this.hpBarDuration = 3;
-      this.lastDamaged = -Infinity
+      this.lastDamaged = -Infinity;
+      this.path = null;
       this.x = x;
       this.y = y;
     }
@@ -99,17 +100,34 @@ export const Entity = (function() {
       this.isAlive = false;
     }
 
-    async hitCell (x, y, speed) {
-      const travelX = (x - this.x) / 2;
-      const travelY = (y - this.y) / 2;
+    async hitCell (x, y, speed) {      
+      const travelX = (x - this.floorX) / 2;
+      const travelY = (y - this.floorY) / 2;
 
-      await new Tween(speed, [this.x, this.x + travelX], [this.y, this.y + travelY]).begin((x, y) => {
-        this.x = x;
-        this.y = y;
+      const toCell = new Tween(speed, [this.x, this.x + travelX], [this.y, this.y + travelY]);
+
+      this.moveTween = toCell;
+      
+      await toCell.begin((x, y) => {
+        if (!this.isMoving) {
+          this.x = x;
+          this.y = y;
+        } else {
+          toCell.cancel();
+        }
       });
-      await new Tween(speed, [this.x, this.x - travelX], [this.y, this.y - travelY]).begin((x, y) => {
-        this.x = x;
-        this.y = y;
+      
+      const backCell = new Tween(speed, [this.x, this.x - travelX], [this.y, this.y - travelY]);
+
+      this.moveTween = backCell;
+      
+      backCell.begin((x, y) => {
+        if (!this.isMoving) {
+          this.x = x;
+          this.y = y;
+        } else {
+          backCell.cancel();
+        }
       });
     }
 
@@ -183,6 +201,24 @@ export const Entity = (function() {
       const [screenX, screenY] = convertToScreenCoordinates(this.x, this.y);
       this.sprite.update(screenX, screenY, defaultTileSize, context, canvasWidth, worldScrollX);
       this.drawHpBar();
+
+      if (Settings.showEntityBounds){
+        context.strokeStyle = Colors.WHITE;
+        context.strokeRect(screenX, screenY, defaultTileSize, defaultTileSize);
+      }
+
+      if (Settings.showPathfinding && this.path && !gameIsOver){
+        this.path.forEach(({x, y}) => {
+          const [screenX, screenY] = convertToScreenCoordinates(x, y);
+          const alpha = context.globalAlpha;
+          
+          context.globalAlpha = 0.5;
+          context.fillStyle = '#0000ff';
+          context.fillRect(screenX, screenY, defaultTileSize, defaultTileSize);
+          context.globalAlpha = alpha;
+        });
+      }
+
     }
   }
 })();
