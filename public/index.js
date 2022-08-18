@@ -892,49 +892,67 @@ function getNeighboringTiles (x, y){
 }
 
 function performPathfinding (startX, startY, endX, endY) {
+  const openList = [];
+  const closedList = [];
   const path = [];
-  const currentPoint = {x: startX, y: startY};
-  const endTileNotPassable = !isPassableCell(endX, endY);
-
-  while (currentPoint.x !== endX || currentPoint.y !== endY) {
-    const neighbors = getNeighboringTiles(currentPoint.x, currentPoint.y).filter(cell => {
-      return isPassableCell(cell.x, cell.y);
-    });
-    
-    if (endTileNotPassable) {
-      const isNeighboringEndTile = getNeighboringTiles(endX, endY).find(cell => {
-        return cell.x === currentPoint.x && cell.y === currentPoint.y;
-      });
-
-      if (isNeighboringEndTile) {
-        break;
+  const start = { x: startX, y: startY };
+  const end = { x: endX, y: endY };
+  const startF = distance(start.x, start.y, end.x, end.y);
+  const startG = 0;
+  const startH = startF;
+  const startNode = {
+    x: start.x,
+    y: start.y,
+    g: startG,
+    h: startH,
+    f: startF
+  };
+  openList.push(startNode);
+  while (openList.length > 0) {
+    let currentNode = openList.shift();
+    if (currentNode.x === end.x && currentNode.y === end.y) {
+      while (currentNode.x !== start.x || currentNode.y !== start.y) {
+        path.push({ x: currentNode.x, y: currentNode.y });
+        currentNode = closedList.find(node => node.x === currentNode.parent.x && node.y === currentNode.parent.y);
       }
+      path.push({ x: currentNode.x, y: currentNode.y });
+      return path.reverse();
     }
-    
-    if (neighbors.length === 0) {
-      break;
-    }
-    
-    if (neighbors.length > 1) {
-      neighbors.sort((cellA, cellB) => {
-        const cellADistance = distance(cellA.x, cellA.y, endX, endY);
-        const cellBDistance = distance(cellB.x, cellB.y, endX, endY);
+    closedList.push(currentNode);
+    const neighbors = getNeighboringTiles(currentNode.x, currentNode.y);
+    neighbors.forEach(neighbor => {
+      if (isSolidTile(neighbor.x, neighbor.y)) {
+        return;
+      }
+      const neighboringNode = closedList.find(node => node.x === neighbor.x && node.y === neighbor.y);
+      if (neighboringNode) {
+        return;
+      }
+      const neighborG = currentNode.g + 1;
+      const neighborH = distance(neighbor.x, neighbor.y, end.x, end.y);
+      const neighborF = neighborG + neighborH;
+      const neighborNode = {
+        x: neighbor.x,
+        y: neighbor.y,
+        g: neighborG,
+        h: neighborH,
+        f: neighborF,
+        parent: currentNode
+      };
+      const openNode = openList.find(node => node.x === neighbor.x && node.y === neighbor.y);
+      if (openNode) {
+        if (openNode.g > neighborG) {
+          openNode.g = neighborG;
+          openNode.f = neighborF;
+          openNode.parent = currentNode;
+        }
+      }
+      else {
+        openList.push(neighborNode);
+      }
+    });
 
-        return cellADistance - cellBDistance;
-      });
-    }
-
-    const [closestCell] = neighbors;
-
-    if (path.length > defaultWorldSize * defaultWorldSize) {
-      console.log('Pathfinding failed!');
-      return [];
-    }
-
-    currentPoint.x = closestCell.x;
-    currentPoint.y = closestCell.y;
-
-    path.push(closestCell);
+    openList.sort((a, b) => a.f - b.f);
   }
 
   return path;
